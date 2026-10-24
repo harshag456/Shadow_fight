@@ -23,6 +23,27 @@ const LV=[
 {id:'jkick',t:'Learn the jumping roundhouse kick',d:'A leaping spin kick with long reach and heavy damage. You are airborne for a moment, so a strike aimed at you can miss.',goal:'Land 2 jumping roundhouse kicks',hint:'Press W within reach',ev:'jkick',need:2,dm:'s'},
 {id:'finisher',t:'Learn the uppercut finisher',d:'Land the double punch, then press Y within 1.5 seconds for a stronger uppercut.',goal:'Land 2 combo finishers',hint:'Get close. Press C, then Y right after',ev:'finisher',need:2,dm:'s'}]}];
 
+/* saved progress: highest unlocked level, best result per level, settings */
+const SK='shadowDojo.v1';
+let SV={u:0,b:{},shake:(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)?0:1};
+try{const r=JSON.parse(localStorage.getItem(SK)||'null');if(r&&typeof r==='object')SV={...SV,...r,b:{...(r.b||{})}}}catch(_){}
+SV.u=Math.max(0,Math.min(LV.length-1,SV.u|0));
+const persist=()=>{try{localStorage.setItem(SK,JSON.stringify(SV))}catch(_){}};
+const hasSave=()=>SV.u>0||Object.keys(SV.b).length>0;
+const starStr=n=>'\u2605'.repeat(n)+'\u2606'.repeat(3-n);
+
+/* score, combo and screen shake */
+let sc=0,combo=0,comboExp=0,comboAt=0,maxC=0,fightT0=0;const pops=[],SH={t:0,d:1,m:0};
+const COMBO_MS=2200,mult=()=>Math.min(5,1+Math.floor(combo/3)),scoring=()=>mode==='fight';
+function comboHit(){if(!scoring())return;if(T>comboExp)combo=0;combo++;comboExp=T+COMBO_MS;comboAt=T;if(combo>maxC)maxC=combo}
+function keepCombo(){if(combo)comboExp=Math.max(comboExp,T+COMBO_MS)}
+function award(base,x,label,col){if(!scoring())return;const v=Math.round(base*mult()),n=pops.filter(p=>T-p.t<350).length;sc+=v;pops.push({x,y:FY-150-n*18,t:T,s:'+'+v+(label?' '+label:''),c:col||'#2a2118'})}
+function resetScore(){sc=combo=maxC=comboExp=0;pops.length=0;fightT0=T}
+function shake(m,d){if(!SV.shake)return;const rem=SH.m*Math.max(0,1-(T-SH.t)/SH.d);if(m>=rem){SH.t=T;SH.d=d;SH.m=m}}
+function shakeOff(){if(paused||!SV.shake)return 0;const k=1-(T-SH.t)/SH.d;if(k<=0)return 0;const a=SH.m*k*k;return[(Math.random()*2-1)*a,(Math.random()*2-1)*a*.6]}
+function fightResult(){const hp=Math.round(pl.hp)*10,time=Math.max(0,Math.round((100-(T-fightT0)/1000)*5));return{hits:sc,hp,time,combo:maxC,total:sc+hp+time,stars:pl.hp>=75?3:pl.hp>=40?2:1}}
+function report(r,nb,prev){return`<p class="tag" style="font-size:24px;letter-spacing:4px;margin:0">${starStr(r.stars)}</p><table><tr><td>Hits</td><td>${r.hits}</td></tr><tr><td>Health bonus</td><td>${r.hp}</td></tr><tr><td>Speed bonus</td><td>${r.time}</td></tr><tr><td>Best combo</td><td>${r.combo} hits</td></tr><tr><td>Total</td><td><b>${r.total}</b> ${nb?'New best!':'(best '+prev.s+')'}</td></tr></table>`}
+
 /* backdrop */
 const BG=document.createElement('canvas');const K=2;C.width=W*K;C.height=H*K;BG.width=W*K;BG.height=H*K;
 (function(){const g=BG.getContext('2d');g.scale(K,K);const gr=g.createLinearGradient(0,0,0,FY);gr.addColorStop(0,'#eadfbd');gr.addColorStop(1,'#d3c293');g.fillStyle=gr;g.fillRect(0,0,W,FY);
@@ -74,20 +95,25 @@ if(dist>m.r){if(!sec)msg(dist>m.r+40?'Out of range. Step closer with D':'Just ou
 let dm=sec?m.d2:m.d;if(guardUp()&&!m.g){dm*=.35;msg('Guard is up. Try a low kick, uppercut or heavy kick')}
 let fin=0;if(a.m==='upper'&&T<=pl.cu2){dm*=1.5;pl.cu2=0;fin=1;msg('Combo finisher!')}
 en.hp=Math.max(0,en.hp-dm);en.hitUntil=T+220;en.x=Math.min(W-40,en.x+(m.kb||10));fx(en.x-14,FY-85,'h');sfx('hit');
-if(m.d>=15&&en.st==='tele'){en.st='stag';en.t=T+600;msg('Interrupted!')}
+comboHit();award(Math.round(dm*10),en.x-14);shake(Math.min(7,1.5+m.d*.28),140+m.d*7);
+if(a.m==='counter')award(200,en.x-14,'Counter','#2f7a63');
+if(fin){award(300,en.x-14,'Finisher','#b8741a');shake(9,320)}
+if(m.d>=15&&en.st==='tele'){en.st='stag';en.t=T+600;msg('Interrupted!');award(200,en.x-14,'Interrupt','#b8741a')}
 if(m.h2){if(!sec)a.ok1=1;else if(a.ok1){pl.cu2=T+1500;emit('combo')}}else{emit(a.m==='counter'?'counter':a.m);if(fin)emit('finisher')}
 if(en.hp<=0)kill()}
-function kill(){en.dead=true;en.dt=T;mode='ending';sfx('win');const tok=run;setTimeout(()=>{if(tok!==run)return;mode='done';const ms=L.steps.map(s=>'<li>'+NM[s.id][0]+'</li>').join('');
-if(lvl<LV.length-1)ov(`<h2>Level complete</h2><p>You beat ${L.foe.n}. Moves learned:</p><ul>${ms}</ul><div class="row"><button class="btn" onclick="nextLevel()">Continue (Enter)</button></div>`),onEnter=nextLevel;
-else ov(`<h2>Victory</h2><p>${L.foe.n} falls. You mastered all ${have.size} moves.</p><ul>${[...have].map(h=>'<li>'+NM[h][0]+'</li>').join('')}</ul><div class="row"><button class="btn" onclick="showMenu()">Play again (Enter)</button></div>`),onEnter=showMenu},1100)}
-function lose(){pl.hp=0;pl.dead=true;pl.dt=T;mode='ending';sfx('hit');const tok=run;setTimeout(()=>{if(tok!==run)return;mode='lost';ov(`<h2>Defeated</h2><p>${L.foe.n} got the better of you. Your moves are intact. Try again.</p><div class="row"><button class="btn" onclick="beginFight()">Retry fight (Enter)</button></div>`);onEnter=beginFight},1000)}
+function kill(){en.dead=true;en.dt=T;mode='ending';sfx('win');shake(11,520);const r=fightResult(),tok=run,prev=SV.b[lvl],nb=!prev||r.total>prev.s;
+SV.b[lvl]={s:nb?r.total:prev.s,st:Math.max(r.stars,prev?prev.st:0),c:Math.max(r.combo,prev?prev.c:0)};SV.u=Math.max(SV.u,Math.min(lvl+1,LV.length-1));persist();
+setTimeout(()=>{if(tok!==run)return;mode='done';
+if(lvl<LV.length-1){ov(`<h2>Level complete</h2>${report(r,nb,prev)}<p>You beat ${L.foe.n}. Moves learned: ${L.steps.map(s=>NM[s.id][0]).join(', ')}.</p><div class="row"><button class="btn" onclick="nextLevel()">Continue (Enter)</button></div>`);onEnter=nextLevel}
+else{const tot=Object.values(SV.b).reduce((a,b)=>a+b.s,0);ov(`<h2>Victory</h2>${report(r,nb,prev)}<p>${L.foe.n} falls. You mastered all ${have.size} moves. Total of your best scores: <b>${tot}</b></p><div class="row"><button class="btn" onclick="showMenu()">Play again (Enter)</button></div>`);onEnter=showMenu}},1100)}
+function lose(){pl.hp=0;pl.dead=true;pl.dt=T;mode='ending';sfx('hit');shake(8,400);combo=0;const tok=run;setTimeout(()=>{if(tok!==run)return;mode='lost';ov(`<h2>Defeated</h2><p>${L.foe.n} got the better of you. Your moves are intact. Score so far: ${sc}. Best combo: ${maxC}. Try again.</p><div class="row"><button class="btn" onclick="beginFight()">Retry fight (Enter)</button></div>`);onEnter=beginFight},1000)}
 
 function startTele(ms){en.st='tele';en.tt=T;en.hitAt=T+ms;en.kind=Math.random()<.5?'cross':'heavy'}
 function enHit(){const c=en.cfg,d=en.x-pl.x;if(d>c.r+8)return;
-if(pl.atk&&pl.atk.m==='jkick'&&T>pl.atk.t0+80&&T<pl.atk.t0+520){msg('Jumped clear!');return}
-if(T<=pl.dodgeUntil){emit('dodge');msg('Dodged!');sfx('dodge');return}
-if(pl.blk){pl.hp-=c.dmg*.15;pl.cu=T+1100;fx(pl.x+30,FY-85,'b');sfx('block');emit('block');msg(have.has('counter')?'Blocked! Press O to counter':'Blocked!')}
-else{pl.hp-=c.dmg;pl.hitUntil=T+320;pl.atk=null;pl.x=Math.max(40,pl.x-16);fx(pl.x+10,FY-90,'h');sfx('hit');if(!c.dmg)msg('You were hit. Time it as the ring closes')}
+if(pl.atk&&pl.atk.m==='jkick'&&T>pl.atk.t0+80&&T<pl.atk.t0+520){msg('Jumped clear!');keepCombo();award(200,pl.x,'Evade','#2f7a63');return}
+if(T<=pl.dodgeUntil){emit('dodge');msg('Dodged!');sfx('dodge');keepCombo();award(250,pl.x,'Dodge','#2f7a63');return}
+if(pl.blk){pl.hp-=c.dmg*.15;pl.cu=T+1100;fx(pl.x+30,FY-85,'b');sfx('block');shake(2,90);keepCombo();award(150,pl.x,'Block','#2f7a63');emit('block');msg(have.has('counter')?'Blocked! Press O to counter':'Blocked!')}
+else{pl.hp-=c.dmg;pl.hitUntil=T+320;pl.atk=null;pl.x=Math.max(40,pl.x-16);fx(pl.x+10,FY-90,'h');sfx('hit');shake(Math.min(10,5+c.dmg*.3),260);if(scoring())combo=0;if(!c.dmg)msg('You were hit. Time it as the ring closes')}
 if(pl.hp<=0)lose()}
 function updEn(dt){if(en.dead)return;const c=en.cfg;
 if(en.st==='stag'){if(T>=en.t){en.st='go';en.nx=T+c.gap}return}
@@ -104,10 +130,17 @@ pl.x=Math.max(40,Math.min(pl.x,en.x-46))}
 /* flow */
 function ov(h,top){vidOff();const o=$('ov');o.className='ov'+(top?(top===2?' bot':' top'):'');o.innerHTML='<div class="card">'+h+'</div>';o.style.display='flex';const b=o.querySelector('.btn');if(b)b.focus({preventScroll:true})}
 const hide=()=>{vidOff();$('ov').style.display='none';onEnter=null};
-function showMenu(){mode='menu';run++;paused=false;have.clear();lvl=0;L=LV[0];resetPl();en=mkEn(TS,560);ov(`<h1>Shadow Dojo</h1><p class="tag">Learn. Fight. Master.</p><p>Eleven moves, four levels. Every move is shown, tried, and proven in a drill before you fight with it.</p><div class="row"><button class="btn" onclick="startGame()">Start game (Enter)</button><button class="btn2" onclick="showControls()">Controls</button><button class="btn2" onclick="showAbout()">About</button></div>`);onEnter=startGame}
-function showControls(){ov(`<h2>Controls</h2><table><tr><td>A / D</td><td>Move left / right</td></tr><tr><td>J</td><td>Jab</td></tr><tr><td>U</td><td>Cross</td></tr><tr><td>I</td><td>Low kick</td></tr><tr><td>Y</td><td>Uppercut</td></tr><tr><td>H</td><td>Heavy kick</td></tr><tr><td>C</td><td>Double punch combo</td></tr><tr><td>W</td><td>Jumping roundhouse kick</td></tr><tr><td>K</td><td>Block (hold)</td></tr><tr><td>L</td><td>Dodge</td></tr><tr><td>O</td><td>Counterattack, right after a block</td></tr><tr><td>Esc</td><td>Pause or resume</td></tr></table><p class="tag">Moves unlock one at a time during training.</p><div class="row"><button class="btn" onclick="showMenu()">Back</button></div>`);onEnter=showMenu}
-function showAbout(){ov(`<h2>About</h2><p>Shadow Dojo teaches fighting moves by making you perform them. A hit only counts toward a drill when it lands, so mashing keys out of range teaches nothing.</p><p>Level 1 teaches jab and block, level 2 cross, low kick and dodge, level 3 uppercut, heavy kick and counterattack, level 4 double punch combo, jumping roundhouse kick and the uppercut finisher. Fight your way to the Shadow Lord.</p><div class="row"><button class="btn" onclick="showMenu()">Back</button></div>`);onEnter=showMenu}
+function showMenu(){mode='menu';run++;paused=false;have.clear();lvl=0;L=LV[0];resetPl();en=mkEn(TS,560);const hs=hasSave(),go=hs?`startLevel(${SV.u})`:'startGame()';
+ov(`<h1>Shadow Dojo</h1><p class="tag">Learn. Fight. Master.</p><p>Eleven moves, four levels. Every move is shown, tried, and proven in a drill before you fight with it.</p><div class="row"><button class="btn" onclick="${go}">${hs?'Continue: Level '+(SV.u+1)+' (Enter)':'Start game (Enter)'}</button>${hs?'<button class="btn2" onclick="showLevels()">Levels</button>':''}<button class="btn2" onclick="showControls()">Controls</button><button class="btn2" onclick="showAbout()">About</button></div>`);onEnter=hs?()=>startLevel(SV.u):startGame}
+function showLevels(){const rows=LV.map((l,i)=>{const b=SV.b[i],open=i<=SV.u;return`<tr><td>${i+1}</td><td>${l.name}</td><td>${b?starStr(b.st)+' '+b.s:open?'':'Locked'}</td><td>${open?`<button class="btn2" onclick="startLevel(${i})">Play</button>`:''}</td></tr>`}).join('');
+ov(`<h2>Levels</h2><table>${rows}</table><p class="tag" style="font-size:13px">Progress is saved in this browser.</p><div class="row"><button class="btn" onclick="showMenu()">Back</button><button class="btn2" onclick="resetSave(this)">Reset progress</button></div>`);onEnter=showMenu}
+function resetSave(b){if(b.dataset.c){SV.u=0;SV.b={};persist();showMenu()}else{b.dataset.c=1;b.textContent='Click again to erase'}}
+const shLab=()=>'Screen shake: '+(SV.shake?'On':'Off');
+function toggleShake(b){SV.shake=SV.shake?0:1;persist();if(b)b.textContent=shLab();if(SV.shake)shake(4,200)}
+function showControls(){ov(`<h2>Controls</h2><table><tr><td>A / D</td><td>Move left / right</td></tr><tr><td>J</td><td>Jab</td></tr><tr><td>U</td><td>Cross</td></tr><tr><td>I</td><td>Low kick</td></tr><tr><td>Y</td><td>Uppercut</td></tr><tr><td>H</td><td>Heavy kick</td></tr><tr><td>C</td><td>Double punch combo</td></tr><tr><td>W</td><td>Jumping roundhouse kick</td></tr><tr><td>K</td><td>Block (hold)</td></tr><tr><td>L</td><td>Dodge</td></tr><tr><td>O</td><td>Counterattack, right after a block</td></tr><tr><td>Esc</td><td>Pause or resume</td></tr></table><p class="tag">Moves unlock one at a time during training.</p><div class="row"><button class="btn" onclick="showMenu()">Back</button><button class="btn2" onclick="toggleShake(this)">${shLab()}</button></div>`);onEnter=showMenu}
+function showAbout(){ov(`<h2>About</h2><p>Shadow Dojo teaches fighting moves by making you perform them. A hit only counts toward a drill when it lands, so mashing keys out of range teaches nothing.</p><p>Level 1 teaches jab and block, level 2 cross, low kick and dodge, level 3 uppercut, heavy kick and counterattack, level 4 double punch combo, jumping roundhouse kick and the uppercut finisher. Fight your way to the Shadow Lord.</p><p>In fights, chain hits within about two seconds to build a combo multiplier. Blocks, dodges, counters and finishers score bonus points, and getting hit breaks the combo.</p><div class="row"><button class="btn" onclick="showMenu()">Back</button></div>`);onEnter=showMenu}
 function startGame(){lvl=0;beginLevel()}
+function startLevel(i){lvl=Math.max(0,Math.min(LV.length-1,i|0));beginLevel()}
 function nextLevel(){lvl++;beginLevel()}
 function restartLevel(){if(mode==='menu')return;paused=false;beginLevel()}
 function beginLevel(){run++;L=LV[lvl];stepI=0;have.clear();for(let i=0;i<lvl;i++)LV[i].steps.forEach(s=>have.add(s.id));resetPl();introStep()}
@@ -116,9 +149,9 @@ ov(`<h2>${s.t}</h2><p>${s.d}</p><p>Goal: ${s.goal}. Key: <b>${NM[s.id][1]}</b></
 function replayTut(){tutT0=T;if(tutVid){V.currentTime=0;V.play().catch(()=>{})}}
 function beginStep(){hide();have.add(S().id);prog=0;mode='train';msg(S().hint,3800)}
 function fightIntro(){stepI=L.steps.length;en=mkEn(TS,560);resetPl();mode='intro';ov(`<h2>Fight: ${L.foe.n}</h2><p>${L.fi}</p><div class="row"><button class="btn" onclick="beginFight()">Begin (Enter)</button></div>`);onEnter=beginFight}
-function beginFight(){run++;hide();en=mkEn(L.foe,600);resetPl();mode='fight';msg('Fight!')}
+function beginFight(){run++;hide();en=mkEn(L.foe,600);resetPl();resetScore();mode='fight';msg('Fight!')}
 function togglePause(force){if(!paused&&mode!=='train'&&mode!=='fight')return;paused=force===true?true:!paused;
-if(paused){ov(`<h2>Paused</h2><div class="row"><button class="btn" onclick="togglePause()">Resume (Enter)</button><button class="btn2" onclick="restartLevel()">Restart level</button></div>`);onEnter=()=>togglePause()}else hide()}
+if(paused){ov(`<h2>Paused</h2><div class="row"><button class="btn" onclick="togglePause()">Resume (Enter)</button><button class="btn2" onclick="restartLevel()">Restart level</button><button class="btn2" onclick="toggleShake(this)">${shLab()}</button></div>`);onEnter=()=>togglePause()}else hide()}
 
 /* input */
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(!AC)try{AC=new AudioContext()}catch(_){}
@@ -180,16 +213,21 @@ if(guardUp())return POSE.block;return idle()}
 /* draw */
 function bar(x,w,fr,col,right,lab){X.fillStyle='#4a3a28';X.fillRect(x,24,w,12);X.fillStyle=col;const ww=w*Math.max(0,fr);X.fillRect(right?x+w-ww:x,24,ww,12);X.fillStyle='#2a2118';X.font='700 13px system-ui,sans-serif';X.textAlign=right?'right':'left';X.fillText(lab,right?x+w:x,19)}
 function draw(){X.setTransform(K,0,0,K,0,0);if(mode==='tut'){drawTut();return}X.drawImage(BG,0,0,W,H);
+const sh=shakeOff();if(sh){X.save();X.translate(sh[0],sh[1]);X.drawImage(BG,0,0,W,H)}
 if(en){const c=en.cfg,dm=c.hp>1e8;fig(en.x,-1,enPose(),{s:c.s||1,c:dm?'#3a3a44':'#0a0a0a',band:dm?0:'#c8363f',fall:en.dead?ez((T-en.dt)/500):0});
 if(en.st==='tele'&&!en.dead){const pr=(T-en.tt)/(en.hitAt-en.tt);X.strokeStyle='#c8363f';X.lineWidth=4;X.beginPath();X.arc(en.x-18,FY-84,8+52*(1-pr),0,7);X.stroke();X.fillStyle='#c8363f';X.font='800 26px Georgia,serif';X.textAlign='center';X.fillText('!',en.x-18,FY-150*(c.s||1))}}
 if(pl)fig(pl.x,1,plPose(),{c:'#0a0a0a',band:'#2f7a63',fall:pl.dead?ez((T-pl.dt)/500):0});
 for(let i=fxs.length-1;i>=0;i--){const f=fxs[i],a=(T-f.t)/260;if(a>1){fxs.splice(i,1);continue}X.lineWidth=3;if(f.k==='b'){X.strokeStyle='#2f7a63';X.beginPath();X.arc(f.x,f.y,8+a*26,-1.2,1.2);X.stroke()}else{X.strokeStyle=i%2?'#f2b441':'#fff';for(let j=0;j<7;j++){const an=j*.9,r1=8+a*14,r2=r1+10;X.beginPath();X.moveTo(f.x+Math.cos(an)*r1,f.y+Math.sin(an)*r1);X.lineTo(f.x+Math.cos(an)*r2,f.y+Math.sin(an)*r2);X.stroke()}}}
-if(mode!=='menu'&&en){bar(20,300,pl.hp/100,'#2f7a63',0,'You');if(en.cfg.hp<1e8)bar(480,300,en.hp/en.max,'#c8363f',1,en.cfg.n);else{X.fillStyle='#2a2118';X.font='700 13px system-ui,sans-serif';X.textAlign='right';X.fillText('Training',780,19)}}
+for(let i=pops.length-1;i>=0;i--){const p=pops[i],a=(T-p.t)/900;if(a>1){pops.splice(i,1);continue}X.globalAlpha=1-a*a;X.font='800 16px system-ui,sans-serif';X.textAlign='center';X.lineWidth=4;X.lineJoin='round';X.strokeStyle='rgba(244,234,208,.95)';X.strokeText(p.s,p.x,p.y-a*34);X.fillStyle=p.c;X.fillText(p.s,p.x,p.y-a*34)}X.globalAlpha=1;
+if(sh)X.restore();
+if(mode!=='menu'&&en){bar(20,300,pl.hp/100,'#2f7a63',0,'You');if(en.cfg.hp<1e8)bar(480,300,en.hp/en.max,'#c8363f',1,en.cfg.n);else{X.fillStyle='#2a2118';X.font='700 13px system-ui,sans-serif';X.textAlign='right';X.fillText('Training',780,19)}
+if(en.cfg.hp<1e8){X.fillStyle='#2a2118';X.font='700 14px system-ui,sans-serif';X.textAlign='center';X.fillText('Score '+sc,400,19);
+if(combo>=2&&T<comboExp){const left=comboExp-T,pop=Math.max(0,1-(T-comboAt)/160);X.globalAlpha=Math.min(1,left/500);X.textAlign='right';X.fillStyle=mult()>=4?'#c8363f':'#2a2118';X.font='800 '+Math.round(22+8*pop)+'px Georgia,serif';X.fillText(combo+' HIT COMBO',780,62);X.font='700 14px system-ui,sans-serif';X.fillText('Score x'+mult(),780,80);X.fillStyle='#4a3a28';X.fillRect(780-120,86,120,4);X.fillStyle='#f2b441';X.fillRect(780-120*(left/COMBO_MS),86,120*(left/COMBO_MS),4);X.globalAlpha=1}}}
 if(T<msgU&&msgT){X.font='700 16px system-ui,sans-serif';const w=X.measureText(msgT).width+28;X.fillStyle='rgba(42,33,24,.9)';X.fillRect(W/2-w/2,mode==='intro'?232:70,w,32);X.fillStyle='#f4ead0';X.textAlign='center';X.fillText(msgT,W/2,(mode==='intro'?232:70)+21)}}
 let lastH='';
 function hud(){let s;if(mode==='menu')s='Press Start to begin.';else{const st=S(),tr=st&&['train','tdone','intro','tut'].includes(mode);
 s=`<b>Level ${lvl+1}: ${L.name}</b> ${tr?'(training)':'(vs '+L.foe.n+')'}<br>`+(tr?`Goal: ${st.goal}. Progress ${prog} of ${st.need}`:`Defeat ${L.foe.n}. Block, dodge and mix your attacks.`)+'<br><span class="ks"><b>A D</b>move</span>'+[...have].map(h=>`<span class="ks"><b>${NM[h][1]}</b>${NM[h][0]}</span>`).join('')}
 if(s!==lastH){$('hud').innerHTML=s;lastH=s}}
 let last=performance.now();
-function loop(n){const dt=Math.min(.05,(n-last)/1000);last=n;if(!paused){T+=dt*1000;if(mode==='train'||mode==='fight'){updPl(dt);updEn(dt)}}draw();hud();requestAnimationFrame(loop)}
+function loop(n){const dt=Math.min(.05,(n-last)/1000);last=n;if(!paused){T+=dt*1000;if(mode==='train'||mode==='fight'){updPl(dt);updEn(dt)}if(combo&&T>comboExp)combo=0}draw();hud();requestAnimationFrame(loop)}
 showMenu();requestAnimationFrame(loop);
