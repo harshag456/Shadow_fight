@@ -23,3 +23,7 @@ table{border-collapse:collapse;width:100%}td{padding:2px 8px 2px 0}td:first-chil
 .ks{display:inline-block;margin:4px 14px 0 0;color:var(--mute)}.ks b{color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:0 6px;margin-right:4px}
 .btns{display:flex;flex-direction:column;gap:6px}.note{color:var(--mute);font-size:13px}
 @media(max-width:560px){h1{font-size:34px}.bar{flex-direction:column}}
+.ov.bot{align-items:flex-end;background:none;pointer-events:none}
+.ov.bot .card{pointer-events:auto;margin-bottom:8px;padding:8px 16px;max-width:600px}
+.ov.bot h2{font-size:20px;margin:0}.ov.bot p{margin:2px 0;font-size:14px}.ov.bot .row{margin-top:6px}
+.vid{position:absolute;left:19%;top:2.2%;width:62%;height:62%;object-fit:contain;background:#000;display:none;z-index:2}
