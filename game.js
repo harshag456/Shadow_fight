@@ -2,7 +2,7 @@ const $=id=>document.getElementById(id),C=$('c'),X=C.getContext('2d'),W=800,H=36
 let tutT0=0,tutVid=false,T=0,mode='menu',paused=false,lvl=0,stepI=0,prog=0,run=0,onEnter=null,msgT='',msgU=0,AC=null,L,en,pl;
 const keys={},have=new Set(),fxs=[];
 const NM={jab:['Jab','J'],block:['Block','K'],dodge:['Dodge','L'],cross:['Cross','U'],low:['Low kick','I'],upper:['Uppercut','Y'],heavy:['Heavy kick','H'],counter:['Counterattack','O'],combo:['Double punch combo','C'],jkick:['Jumping roundhouse kick','W'],finisher:['Uppercut finisher','Y']};
-const MV={jab:{r:78,d:6,h:90,e:280,p:'jab'},cross:{r:86,d:11,h:150,e:430,p:'cross'},low:{r:92,d:8,h:140,e:400,p:'low',g:1},upper:{r:66,d:15,h:170,e:520,p:'upper',g:1},heavy:{r:100,d:19,h:300,e:760,p:'heavy',g:1},counter:{r:90,d:17,h:110,e:400,p:'counter',g:1},combo:{r:84,d:6,d2:8,h:90,h2:250,e:540,p:'combo',kb:3},jkick:{r:112,d:21,h:260,e:880,p:'jkick',g:1}};
+const MV={jab:{r:78,d:6,h:90,e:280,p:'jab'},cross:{r:86,d:11,h:150,e:430,p:'cross'},low:{r:92,d:8,h:140,e:400,p:'low',g:1,bp:1},upper:{r:66,d:15,h:170,e:520,p:'upper',g:1,bp:.5},heavy:{r:100,d:19,h:300,e:760,p:'heavy',g:1,bp:.5},counter:{r:90,d:17,h:110,e:400,p:'counter',g:1,bp:.5},combo:{r:84,d:6,d2:8,h:90,h2:250,e:540,p:'combo',kb:3},jkick:{r:112,d:21,h:260,e:880,p:'jkick',g:1,bp:.5}};
 const TIP={jab:'Jab is quick but light. Use it to keep pressure on the enemy.',cross:'Cross hits harder than a jab but takes longer to recover.',low:'Low kicks go under a raised guard. Use them when the enemy covers up.',upper:'Uppercut has short reach. Get close first. It can interrupt a wind-up.',heavy:'Heavy kick has long reach and big damage, but a miss leaves you open.',block:'A clean block takes almost no damage and opens a counter.',dodge:'Press L just before the ring closes. Too early or too late and you are hit.',counter:'Block first, then counter within one second.',combo:'Two quick punches in one press. Both hits must land, so stay close.',jkick:'Long reach, and you are airborne for a moment so strikes can miss you. A miss leaves you open.',finisher:'Land the combo, then press Y within 1.5 seconds for a 50% stronger uppercut.'};
 const KEY={j:'jab',u:'cross',i:'low',y:'upper',h:'heavy',o:'counter',c:'combo',w:'jkick'};
 const TS={n:'Dummy',hp:1e9,still:1,gap:1e9,dmg:0,r:74},TG={...TS,guard:1},TA={n:'Trainer',hp:1e9,spd:45,tele:950,rec:800,gap:700,dmg:0,r:74};
@@ -10,15 +10,15 @@ const LV=[
 {name:'The Initiate',foe:{n:'Kenji',hp:60,spd:55,tele:750,rec:1500,gap:1100,dmg:7,r:74},fi:'Kenji is slow. Watch the ring around him, block his strikes, and answer with jabs.',steps:[
 {id:'jab',t:'Learn the jab',d:'Your fastest strike. Short reach, light damage, almost no recovery.',goal:'Land 3 jabs on the dummy',hint:'Step in with D, then press J',ev:'jab',need:3,dm:'s'},
 {id:'block',t:'Learn the block',d:'Hold K as the trainer strikes. A clean block cuts almost all damage.',goal:'Block 2 attacks',hint:'Hold K before the ring closes',ev:'block',need:2,dm:'a'}]},
-{name:'The Disciple',foe:{n:'Haruto',hp:80,spd:85,tele:560,rec:950,gap:700,dmg:9,r:78,guard:1},fi:'Haruto strikes faster and covers up between attacks. Low kicks beat his guard. Dodge when the ring closes.',steps:[
+{name:'The Disciple',foe:{n:'Haruto',hp:80,spd:85,tele:560,rec:950,gap:700,dmg:9,r:78,blk:.45,react:100,cnt:.25},fi:'Haruto strikes faster and now blocks your attacks. Quick jabs land before he reacts, and low kicks slip under his guard. Dodge when the ring closes.',steps:[
 {id:'cross',t:'Learn the cross',d:'A rear-hand straight punch. Slower than the jab, nearly twice the damage.',goal:'Land 3 crosses',hint:'Get in range, then press U',ev:'cross',need:3,dm:'s'},
 {id:'low',t:'Learn the low kick',d:'Sweeps under a high guard. This dummy covers up, so jabs and crosses barely hurt it.',goal:'Land 3 low kicks on the guarded dummy',hint:'Press I within reach',ev:'low',need:3,dm:'g'},
 {id:'dodge',t:'Learn the dodge',d:'Slip an attack by pressing L just before it lands. Too early or too late and you are hit.',goal:'Dodge 2 attacks',hint:'Press L as the ring closes',ev:'dodge',need:2,dm:'a'}]},
-{name:'The Master',foe:{n:'Shadow Master',hp:140,spd:105,tele:400,rec:600,gap:450,dmg:13,r:84,guard:1,chain:.4,s:1.15},fi:'The Shadow Master punishes careless attacks and sometimes strikes twice. Uppercuts and heavy kicks interrupt his wind-up. Use everything you have learned.',steps:[
+{name:'The Master',foe:{n:'Shadow Master',hp:140,spd:105,tele:400,rec:600,gap:450,dmg:13,r:84,blk:.55,react:80,cnt:.35,chain:.4,s:1.15},fi:'The Shadow Master blocks often and punishes careless attacks. Uppercuts and heavy kicks break part of his guard and interrupt his wind-up. Use everything you have learned.',steps:[
 {id:'upper',t:'Learn the uppercut',d:'Short range, high damage. A solid hit interrupts an enemy mid wind-up.',goal:'Land 3 uppercuts',hint:'Uppercut reach is short. Get close, then press Y',ev:'upper',need:3,dm:'s'},
 {id:'heavy',t:'Learn the heavy kick',d:'Slow and strong with long reach. If it misses, you are wide open.',goal:'Land 2 heavy kicks',hint:'Press H within reach',ev:'heavy',need:2,dm:'s'},
 {id:'counter',t:'Learn the counterattack',d:'Block an attack, then press O within one second for a fast, strong reply.',goal:'Land 2 counterattacks',hint:'Hold K, block the strike, then tap O',ev:'counter',need:2,dm:'a'}]},
-{name:'The Grandmaster',foe:{n:'Kage, the Shadow Lord',hp:180,spd:115,tele:340,rec:520,gap:380,dmg:14,r:86,guard:1,chain:.5,s:1.2},fi:'Kage is faster than anyone you have faced and chains his attacks. Open with combos, finish with an uppercut, and use the jumping kick to get clear.',steps:[
+{name:'The Grandmaster',foe:{n:'Kage, the Shadow Lord',hp:180,spd:115,tele:340,rec:520,gap:380,dmg:14,r:86,blk:.65,react:55,cnt:.45,chain:.5,s:1.2},fi:'Kage is faster than anyone you have faced and chains his attacks. He blocks and hits back, so mix your attacks. Open with combos, finish with an uppercut, and use the jumping kick to get clear.',steps:[
 {id:'combo',t:'Learn the double punch combo',d:'Two fast punches in one press. Both hits must land to count.',goal:'Land 3 full combos on the dummy',hint:'Get close, then press C',ev:'combo',need:3,dm:'s'},
 {id:'jkick',t:'Learn the jumping roundhouse kick',d:'A leaping spin kick with long reach and heavy damage. You are airborne for a moment, so a strike aimed at you can miss.',goal:'Land 2 jumping roundhouse kicks',hint:'Press W within reach',ev:'jkick',need:2,dm:'s'},
 {id:'finisher',t:'Learn the uppercut finisher',d:'Land the double punch, then press Y within 1.5 seconds for a stronger uppercut.',goal:'Land 2 combo finishers',hint:'Get close. Press C, then Y right after',ev:'finisher',need:2,dm:'s'}]}];
@@ -77,11 +77,12 @@ function tone(f1,f2,d,ty,v,dl){if(!AC)return;const t=AC.currentTime+(dl||0),o=AC
 function sfx(k){({hit:()=>tone(160,50,.14,'square',.08),block:()=>tone(520,380,.07,'triangle',.1),whoosh:()=>tone(320,140,.08,'sawtooth',.03),dodge:()=>tone(700,380,.1,'sine',.07),win:()=>[392,494,587,784].forEach((f,i)=>tone(f,f,.18,'triangle',.08,i*.1))})[k]()}
 
 /* state */
-const mkEn=(c,x)=>({cfg:c,x,hp:c.hp,max:c.hp,st:'go',t:0,nx:T+c.gap,tt:0,hitAt:0,hitUntil:0,kind:'cross',dead:false,dt:0});
+const mkEn=(c,x)=>({cfg:c,x,hp:c.hp,max:c.hp,st:'go',t:0,nx:T+c.gap,tt:0,hitAt:0,hitUntil:0,kind:'cross',dead:false,dt:0,blkAt:-1,blkUntil:-1});
 function resetPl(){pl={x:160,hp:100,atk:null,blk:false,dodgeUntil:0,hitUntil:0,cu:0,cu2:0,dead:false,dt:0}}
 const msg=(t,ms)=>{msgT=t;msgU=T+(ms||1700)};
 const busy=()=>(pl.atk&&T<pl.atk.end)||T<pl.hitUntil||T<pl.dodgeUntil+250;
 const guardUp=()=>en.cfg.guard&&!['tele','stag'].includes(en.st)&&!(en.st==='rec'&&T-en.hitAt<260);
+const bAct=()=>!en.dead&&T>=en.blkAt&&T<en.blkUntil;
 const fx=(x,y,k)=>fxs.push({x,y,t:T,k});
 const S=()=>L.steps[stepI];
 
@@ -94,7 +95,13 @@ function dodge(){if(!have.has('dodge')||busy()||pl.dead)return;pl.atk=null;pl.do
 function resolveAtk(a,sec){const m=MV[a.m];if(en.dead)return;const dist=en.x-pl.x;
 if(mode==='prac')pracHit(a,dist,dist<=m.r);
 if(dist>m.r){if(!sec)msg(dist>m.r+40?'Out of range. Step closer with D':'Just out of reach. Move in a little');return}
-let dm=sec?m.d2:m.d;if(guardUp()&&!m.g){dm*=.35;msg('Guard is up. Try a low kick, uppercut or heavy kick')}
+let bk=bAct()?1-(m.bp||0):0;
+if(bk>=1){const c=en.cfg;en.hp=Math.max(0,en.hp-(sec?m.d2:m.d)*.1);fx(en.x-30,FY-85,'b');sfx('block');shake(2.5,100);msg('Blocked! Low kicks go under a guard');
+if(!a.cd){a.cd=1;if(Math.random()<c.cnt){en.blkAt=en.blkUntil=-1;startTele(c.tele*.65)}}
+if(en.hp<=0)kill();return}
+let dm=sec?m.d2:m.d;if(bk>0){dm*=1-bk*.9;en.blkUntil=T;msg('Guard broken! Part of the hit gets through');award(120,en.x-14,'Guard break','#b8741a')}
+else if(bAct()&&m.bp>=1)award(100,en.x-14,'Under guard','#b8741a');
+if(guardUp()&&!m.g){dm*=.35;msg('Guard is up. Try a low kick, uppercut or heavy kick')}
 let fin=0;if(a.m==='upper'&&T<=pl.cu2){dm*=1.5;pl.cu2=0;fin=1;msg('Combo finisher!')}
 en.hp=Math.max(0,en.hp-dm);en.hitUntil=T+220;en.x=Math.min(W-40,en.x+(m.kb||10));fx(en.x-14,FY-85,'h');sfx('hit');
 comboHit();award(Math.round(dm*10),en.x-14);shake(Math.min(7,1.5+m.d*.28),140+m.d*7);
@@ -110,7 +117,7 @@ if(lvl<LV.length-1){ov(`<h2>Level complete</h2>${report(r,nb,prev)}<p>You beat $
 else{const tot=Object.values(SV.b).reduce((a,b)=>a+b.s,0);ov(`<h2>Victory</h2>${report(r,nb,prev)}<p>${L.foe.n} falls. You mastered all ${have.size} moves. Total of your best scores: <b>${tot}</b></p><div class="row"><button class="btn" onclick="showMenu()">Play again (Enter)</button></div>`);onEnter=showMenu}},1100)}
 function lose(){pl.hp=0;pl.dead=true;pl.dt=T;mode='ending';sfx('hit');shake(8,400);combo=0;const tok=run;setTimeout(()=>{if(tok!==run)return;mode='lost';ov(`<h2>Defeated</h2><p>${L.foe.n} got the better of you. Your moves are intact. Score so far: ${sc}. Best combo: ${maxC}. Try again.</p><div class="row"><button class="btn" onclick="beginFight()">Retry fight (Enter)</button></div>`);onEnter=beginFight},1000)}
 
-function startTele(ms){en.st='tele';en.tt=T;en.hitAt=T+ms;en.kind=Math.random()<.5?'cross':'heavy'}
+function startTele(ms){en.blkAt=en.blkUntil=-1;en.st='tele';en.tt=T;en.hitAt=T+ms;en.kind=Math.random()<.5?'cross':'heavy'}
 function enHit(){const c=en.cfg,d=en.x-pl.x;if(d>c.r+8)return;
 if(pl.atk&&pl.atk.m==='jkick'&&T>pl.atk.t0+80&&T<pl.atk.t0+520){msg('Jumped clear!');keepCombo();award(200,pl.x,'Evade','#2f7a63');return}
 if(T<=pl.dodgeUntil){emit('dodge');msg('Dodged!');sfx('dodge');keepCombo();award(250,pl.x,'Dodge','#2f7a63');return}
@@ -118,10 +125,11 @@ if(pl.blk){pl.hp-=c.dmg*.15;pl.cu=T+1100;fx(pl.x+30,FY-85,'b');sfx('block');shak
 else{pl.hp-=c.dmg;pl.hitUntil=T+320;pl.atk=null;pl.x=Math.max(40,pl.x-16);fx(pl.x+10,FY-90,'h');sfx('hit');shake(Math.min(10,5+c.dmg*.3),260);if(scoring())combo=0;if(!c.dmg)msg('You were hit. Time it as the ring closes')}
 if(pl.hp<=0)lose()}
 function updEn(dt){if(en.dead)return;const c=en.cfg;
+const pa=pl.atk;if(c.blk&&pa&&!pa.seen){pa.seen=1;const pm=MV[pa.m];if(en.st==='go'&&T>=en.blkUntil+350&&en.x-pl.x<=pm.r+30&&Math.random()<c.blk){en.blkAt=T+c.react;en.blkUntil=en.blkAt+420}}
 if(en.st==='stag'){if(T>=en.t){en.st='go';en.nx=T+c.gap}return}
 if(en.st==='tele'){if(T>=en.hitAt){enHit();en.st='rec';en.t=T+c.rec}return}
 if(en.st==='rec'){if(T>=en.t){if(c.chain&&!en.ch&&Math.random()<c.chain){en.ch=1;startTele(c.tele*.7)}else{en.ch=0;en.st='go';en.nx=T+c.gap}}return}
-if(c.still)return;if(en.x-pl.x>c.r-12)en.x=Math.max(pl.x+46,en.x-c.spd*dt);else if(T>=en.nx)startTele(c.tele)}
+if(c.still||T<en.blkUntil)return;if(en.x-pl.x>c.r-12)en.x=Math.max(pl.x+46,en.x-c.spd*dt);else if(T>=en.nx)startTele(c.tele)}
 function updPl(dt){if(pl.dead)return;const a=pl.atk,act=a&&T<a.end;
 if(a&&!a.done&&T>=a.hit){a.done=1;resolveAtk(a)}
 if(a&&MV[a.m].h2&&!a.d2&&T>=a.t0+MV[a.m].h2){a.d2=1;resolveAtk(a,1)}
@@ -297,6 +305,7 @@ function plPose(){if(mode==='intro')return demoPose();if(pl.dead||T<pl.hitUntil)
 if(a&&T<a.end){if(a.m==='combo')return comboPose(T-a.t0);const p=(T-a.t0)/(a.end-a.t0),h=(a.hit-a.t0)/(a.end-a.t0);return mix(IDLE,POSE[MV[a.m].p],ez(p<h?p/h:1-(p-h)/(1-h)))}
 if(T<pl.dodgeUntil)return POSE.dodge;if(pl.blk)return POSE.block;return idle()}
 function enPose(){if(en.dead||T<en.hitUntil||en.st==='stag')return POSE.hit;
+if(bAct())return POSE.block;
 if(en.st==='tele')return mix(IDLE,POSE.wind,ez((T-en.tt)/(en.hitAt-en.tt)));
 if(en.st==='rec'&&T-en.hitAt<260)return mix(POSE[en.kind],IDLE,ez((T-en.hitAt)/260));
 if(guardUp())return POSE.block;return idle()}
