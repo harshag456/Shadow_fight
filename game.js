@@ -28,6 +28,7 @@ const SK='shadowDojo.v1';
 let SV={u:0,b:{},shake:(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)?0:1};
 try{const r=JSON.parse(localStorage.getItem(SK)||'null');if(r&&typeof r==='object')SV={...SV,...r,b:{...(r.b||{})}}}catch(_){}
 SV.u=Math.max(0,Math.min(LV.length-1,SV.u|0));
+if(!SV.ac||typeof SV.ac!=='object')SV.ac={};
 const persist=()=>{try{localStorage.setItem(SK,JSON.stringify(SV))}catch(_){}};
 const hasSave=()=>SV.u>0||Object.keys(SV.b).length>0;
 const starStr=n=>'\u2605'.repeat(n)+'\u2606'.repeat(3-n);
@@ -91,6 +92,7 @@ function tryAtk(m){if(!have.has(m)||busy()||pl.dead)return;if(m==='counter'){if(
 const d=MV[m];pl.atk={m,t0:T,hit:T+d.h,end:T+d.e,done:false};pl.blk=false;sfx('whoosh')}
 function dodge(){if(!have.has('dodge')||busy()||pl.dead)return;pl.atk=null;pl.dodgeUntil=T+280;sfx('dodge')}
 function resolveAtk(a,sec){const m=MV[a.m];if(en.dead)return;const dist=en.x-pl.x;
+if(mode==='prac')pracHit(a,dist,dist<=m.r);
 if(dist>m.r){if(!sec)msg(dist>m.r+40?'Out of range. Step closer with D':'Just out of reach. Move in a little');return}
 let dm=sec?m.d2:m.d;if(guardUp()&&!m.g){dm*=.35;msg('Guard is up. Try a low kick, uppercut or heavy kick')}
 let fin=0;if(a.m==='upper'&&T<=pl.cu2){dm*=1.5;pl.cu2=0;fin=1;msg('Combo finisher!')}
@@ -128,10 +130,10 @@ if(!act&&T>=pl.hitUntil){pl.x+=((keys.d?1:0)-(keys.a?1:0))*(pl.blk?80:170)*dt}
 pl.x=Math.max(40,Math.min(pl.x,en.x-46))}
 
 /* flow */
-function ov(h,top){vidOff();const o=$('ov');o.className='ov'+(top?(top===2?' bot':' top'):'');o.innerHTML='<div class="card">'+h+'</div>';o.style.display='flex';const b=o.querySelector('.btn');if(b)b.focus({preventScroll:true})}
+function ov(h,top,wide){vidOff();const o=$('ov');o.className='ov'+(top?(top===2?' bot':' top'):'');o.innerHTML='<div class="card'+(wide?' wide':'')+'">'+h+'</div>';o.style.display='flex';const b=o.querySelector('.btn');if(b)b.focus({preventScroll:true})}
 const hide=()=>{vidOff();$('ov').style.display='none';onEnter=null};
-function showMenu(){mode='menu';run++;paused=false;have.clear();lvl=0;L=LV[0];resetPl();en=mkEn(TS,560);const hs=hasSave(),go=hs?`startLevel(${SV.u})`:'startGame()';
-ov(`<h1>Shadow Dojo</h1><p class="tag">Learn. Fight. Master.</p><p>Eleven moves, four levels. Every move is shown, tried, and proven in a drill before you fight with it.</p><div class="row"><button class="btn" onclick="${go}">${hs?'Continue: Level '+(SV.u+1)+' (Enter)':'Start game (Enter)'}</button>${hs?'<button class="btn2" onclick="showLevels()">Levels</button>':''}<button class="btn2" onclick="showControls()">Controls</button><button class="btn2" onclick="showAbout()">About</button></div>`);onEnter=hs?()=>startLevel(SV.u):startGame}
+function showMenu(){mode='menu';acadSel=false;run++;paused=false;have.clear();lvl=0;L=LV[0];resetPl();en=mkEn(TS,560);const hs=hasSave(),go=hs?`startLevel(${SV.u})`:'startGame()';
+ov(`<h1>Shadow Dojo</h1><p class="tag">Learn. Fight. Master.</p><p>Eleven moves, four levels. Every move is shown, tried, and proven in a drill before you fight with it.</p><div class="row"><button class="btn" onclick="${go}">${hs?'Continue: Level '+(SV.u+1)+' (Enter)':'Start game (Enter)'}</button>${hs?'<button class="btn2" onclick="showLevels()">Levels</button>':''}<button class="btn2" onclick="showAcademy()">Academy</button><button class="btn2" onclick="showControls()">Controls</button><button class="btn2" onclick="showAbout()">About</button></div>`);onEnter=hs?()=>startLevel(SV.u):startGame}
 function showLevels(){const rows=LV.map((l,i)=>{const b=SV.b[i],open=i<=SV.u;return`<tr><td>${i+1}</td><td>${l.name}</td><td>${b?starStr(b.st)+' '+b.s:open?'':'Locked'}</td><td>${open?`<button class="btn2" onclick="startLevel(${i})">Play</button>`:''}</td></tr>`}).join('');
 ov(`<h2>Levels</h2><table>${rows}</table><p class="tag" style="font-size:13px">Progress is saved in this browser.</p><div class="row"><button class="btn" onclick="showMenu()">Back</button><button class="btn2" onclick="resetSave(this)">Reset progress</button></div>`);onEnter=showMenu}
 function resetSave(b){if(b.dataset.c){SV.u=0;SV.b={};persist();showMenu()}else{b.dataset.c=1;b.textContent='Click again to erase'}}
@@ -142,7 +144,7 @@ function showAbout(){ov(`<h2>About</h2><p>Shadow Dojo teaches fighting moves by 
 function startGame(){lvl=0;beginLevel()}
 function startLevel(i){lvl=Math.max(0,Math.min(LV.length-1,i|0));beginLevel()}
 function nextLevel(){lvl++;beginLevel()}
-function restartLevel(){if(mode==='menu')return;paused=false;beginLevel()}
+function restartLevel(){if(mode==='menu'||mode==='acad'||mode==='pdone')return;if(mode==='prac'){paused=false;startPractice(AD.i);return}paused=false;beginLevel()}
 function beginLevel(){run++;L=LV[lvl];stepI=0;have.clear();for(let i=0;i<lvl;i++)LV[i].steps.forEach(s=>have.add(s.id));resetPl();introStep()}
 function introStep(){const s=S();prog=0;en=mkEn(s.dm==='a'?TA:s.dm==='g'?TG:TS,560);resetPl();mode='tut';tutT0=T;
 ov(`<h2>${s.t}</h2><p>${s.d}</p><p>Goal: ${s.goal}. Key: <b>${NM[s.id][1]}</b></p><div class="row" style="margin-top:6px"><button class="btn" onclick="beginStep()">Start drill (Enter)</button><button class="btn2" onclick="replayTut()">Replay tutorial</button></div>`,2);onEnter=beginStep;vidOn(s.id)}
@@ -150,18 +152,107 @@ function replayTut(){tutT0=T;if(tutVid){V.currentTime=0;V.play().catch(()=>{})}}
 function beginStep(){hide();have.add(S().id);prog=0;mode='train';msg(S().hint,3800)}
 function fightIntro(){stepI=L.steps.length;en=mkEn(TS,560);resetPl();mode='intro';ov(`<h2>Fight: ${L.foe.n}</h2><p>${L.fi}</p><div class="row"><button class="btn" onclick="beginFight()">Begin (Enter)</button></div>`);onEnter=beginFight}
 function beginFight(){run++;hide();en=mkEn(L.foe,600);resetPl();resetScore();mode='fight';msg('Fight!')}
-function togglePause(force){if(!paused&&mode!=='train'&&mode!=='fight')return;paused=force===true?true:!paused;
+function togglePause(force){if(!paused&&!live())return;paused=force===true?true:!paused;
 if(paused){ov(`<h2>Paused</h2><div class="row"><button class="btn" onclick="togglePause()">Resume (Enter)</button><button class="btn2" onclick="restartLevel()">Restart level</button><button class="btn2" onclick="toggleShake(this)">${shLab()}</button></div>`);onEnter=()=>togglePause()}else hide()}
+
+
+/* ===== Academy: move training lessons =====
+   Reuses MV (reach and timing), POSE + swing + fig (animation), tryAtk (input) and resolveAtk (hit check).
+   Only one new animation exists: the flying front kick (pose + MV entry), which is never unlocked in the campaign. */
+NM.fkick=['Flying front kick','F'];MV.fkick={r:106,d:18,h:240,e:820,p:'fkick',g:1};TIP.fkick='Long reach, but slow to recover. This move exists only in the academy for now.';KEY.f='fkick';
+POSE.fkick={lean:-.18,cr:0,up:50,fh:[22,2],bh:[6,18],ff:[84,-24],bf:[-10,22]};
+const live=()=>mode==='train'||mode==='fight'||mode==='prac';
+const STG=['Starting stance','Preparation','Execution','Recovery','Complete move practice'];
+const ACD=[
+{id:'jab',name:'Basic Punch',diff:'Beginner',need:3,min:70},
+{id:'jkick',name:'Jumping Roundhouse Kick',diff:'Intermediate',need:3,min:70},
+{id:'fkick',name:'Flying Front Kick',diff:'Advanced',need:3,min:70}];
+let acadSel=false,AD={i:0,id:'jab',stage:0,t:0,playing:true,speed:1,cur:null,good:0,fb:'',wrong:[]};
+const unlocked=i=>i===0||!!(SV.ac[ACD[i-1].id]&&SV.ac[ACD[i-1].id].done);
+const zoneLo=r=>Math.ceil(.6*r);
+
+function acadText(d,s){const A=MV[d.id],k=NM[d.id][1],lo=zoneLo(A.r);return[
+'Stand in your guard, facing the dummy, with your weight balanced. A strike can only start while you are not already attacking, recovering from a hit or dodging.',
+`Close the distance with D until you are inside the green target zone, ${lo} to ${A.r} units from the dummy. This move reaches ${A.r} units, so from farther away the strike misses. The distance readout shows where you stand.`,
+`Press ${k} once. The strike lands ${A.h} ms after the key press and counts only if the dummy is within ${A.r} units at that moment. ${TIP[d.id]}`,
+`After the strike you cannot act for about ${A.e-A.h} ms (the whole move takes ${A.e} ms). Inputs during that time are ignored, so wait for your character to return to stance before trying again.`,
+`Land ${d.need} attempts scoring ${d.min} or more. Score out of 100: execution 40 (correct key and the hit lands), distance 30 (strike from the target zone), recovery 30 (no inputs while recovering). Press Practice when you are ready.`][s]}
+
+/* selection screen */
+function showAcademy(){mode='menu';acadSel=true;run++;paused=false;have.clear();resetPl();en=mkEn(TS,560);
+const rows=ACD.map((d,i)=>{const p=SV.ac[d.id]||{},open=unlocked(i);
+const st=!open?'Locked: pass '+ACD[i-1].name+' first':p.done?'Completed '+starStr(p.stars)+'<br>best '+p.best+' of 100':p.tries?'In progress: '+(p.good||0)+' of '+d.need+' good attempts':'Not started';
+return`<tr><td>${i+1}</td><td><b>${d.name}</b><br><span class="tag" style="font-size:13px">${d.diff} · key ${NM[d.id][1]}</span></td><td>${st}</td><td>${open?`<button class="btn2" onclick="openLesson(${i})">${p.tries?'Open':'Start'}</button>`:''}</td></tr>`}).join('');
+ov(`<h2>Training Academy</h2><p class="tag" style="font-size:15px">Learn one move at a time. Pass a lesson to unlock the next.</p><table>${rows}</table><div class="row"><button class="btn" onclick="showMenu()">Back</button><button class="btn2" onclick="resetAcademy(this)">Reset academy progress</button></div>`,0,1);onEnter=showMenu}
+function resetAcademy(b){if(b.dataset.c){SV.ac={};persist();showAcademy()}else{b.dataset.c=1;b.textContent='Click again to erase'}}
+
+/* lesson screen: demonstration built from the existing poses */
+function openLesson(i){if(!unlocked(i))return;run++;paused=false;hide();have.clear();AD.i=i;AD.id=ACD[i].id;AD.stage=0;AD.t=0;AD.playing=true;AD.speed=1;mode='acad'}
+const setStage=k=>{AD.stage=k;AD.t=0};
+const demoPlay=()=>{AD.playing=!AD.playing};
+const demoReplay=()=>{AD.t=0;AD.playing=true};
+const demoSpeed=()=>{AD.speed=AD.speed===1?.5:AD.speed===.5?.25:1};
+const acadT=id=>{const A=MV[id],ta=2.7;return{ta,h:ta+A.h/1000,e:ta+A.e/1000,D:ta+A.e/1000+.8,tx:480-.8*A.r}};
+const acadWin=(tm,st)=>[[0,1],[1,2.6],[tm.ta-.35,tm.h+.45],[tm.h,tm.e+.5],[0,tm.D]][st];
+function lessonScene(id,st,lt,tm){const A=MV[id],EXd=480,r=A.r,lo=zoneLo(r),key=NM[id][1];
+const px=lt<1?150:150+(tm.tx-150)*ez((lt-1)/1.4);let pp=idle(),ep=idle();
+const w=swing(id,tm.ta,lt);if(w)pp=w;const hitting=lt>tm.h&&lt<tm.h+.3;if(hitting)ep=POSE.hit;
+if(st>0){X.fillStyle='rgba(47,122,99,.45)';X.fillRect(EXd-r,FY+4,r*.4,12);X.font='700 12px system-ui,sans-serif';X.textAlign='center';X.fillStyle='#2a2118';X.fillText('target zone',EXd-r*.8,FY+32)}
+fig(px,1,pp,{c:'#0a0a0a',band:'#2f7a63'});fig(EXd,-1,ep,{c:'#3a3a44'});if(hitting)burst(EXd-14,FY-85,(lt-tm.h)/.3,'h');
+pill((st+1)+'. '+STG[st],W/2,44,22,'rgba(42,33,24,.9)','#f4ead0');
+if(lt<tm.h){const d=Math.round(EXd-px),inz=d>=lo&&d<=r;if(st!==0)pill('Distance '+d+' · reach '+r+(inz?' · in zone':''),W/2,86,18,inz?'rgba(47,122,99,.92)':'rgba(42,33,24,.9)','#f4ead0')}
+else if(lt<=tm.e)pill('Recovery: inputs ignored · '+Math.max(0,Math.round((tm.e-lt)*1000))+' ms left',W/2,86,18,'rgba(184,116,26,.95)','#fff');
+if(st===2||st===4){const on=lt>tm.ta&&lt<tm.ta+.25;X.fillStyle=on?'#f2b441':'#efe6d0';X.fillRect(152,FY+8,36,34);X.strokeStyle='#2a2118';X.lineWidth=2;X.strokeRect(152,FY+8,36,34);X.fillStyle='#2a2118';X.font='800 20px system-ui,sans-serif';X.textAlign='center';X.fillText(key,170,FY+32)}}
+function drawLesson(){const d=ACD[AD.i],tm=acadT(d.id),w=acadWin(tm,AD.stage),len=w[1]-w[0],rel=AD.t%len;X.drawImage(BG,0,0,W,H);lessonScene(d.id,AD.stage,w[0]+rel,tm);X.fillStyle='#c8363f';X.fillRect(0,H-4,W*(rel/len),4)}
+
+/* practice mode: normal controls, normal combat code, one dummy */
+function startPractice(i){if(!unlocked(i))return;const d=ACD[i];run++;paused=false;hide();AD.i=i;AD.id=d.id;have.clear();have.add(d.id);resetPl();en=mkEn(TS,560);mode='prac';
+const p=SV.ac[d.id]||{};AD.good=p.done?0:(p.good||0);AD.cur=null;AD.fb='';AD.wrong=[];msg('Walk in with D, then press '+NM[d.id][1],3200)}
+function pracReset(){if(mode!=='prac')return;pl.x=160;en.x=560;pl.atk=null;AD.cur=null}
+function pracKey(k){const m=KEY[k];if(!m)return;
+if(m!==AD.id){AD.wrong.push(NM[m][1]+' ('+NM[m][0]+')');msg('That key is '+NM[m][1]+' ('+NM[m][0]+'). This lesson uses '+NM[AD.id][1],2400);return}
+if(busy()){const c=AD.cur;if(c&&!c.fin)c.early++;const left=pl.atk&&T<pl.atk.end?Math.round(pl.atk.end-T):0;msg('Too early: still recovering'+(left?' ('+left+' ms left)':''),1800);return}
+tryAtk(AD.id);const a=pl.atk;if(a&&a.m===AD.id&&a.t0===T)AD.cur={a,end:a.end,dist0:en.x-pl.x,dist:null,hit:false,early:0,fin:0}}
+function pracHit(a,dist,ok){const c=AD.cur;if(c&&c.a===a){c.dist=dist;c.hit=ok}}
+function pracTick(){const c=AD.cur;if(c&&!c.fin&&T>=c.end){c.fin=1;finishAttempt(c)}}
+function finishAttempt(c){const d=ACD[AD.i],A=MV[d.id],r=A.r,lo=zoneLo(r),k=NM[d.id][1],p=SV.ac[d.id]||(SV.ac[d.id]={tries:0,good:0,best:0,stars:0,done:false}),notes=[];
+let ex=0,ds=0;
+if(c.hit){ex=40;const dd=Math.round(c.dist);if(dd>=lo)ds=30;else{ds=15;notes.push(`Distance: you struck from ${dd} units, closer than the target zone (${lo} to ${r}). Step back a little with A first.`)}}
+else notes.push(`Distance: the dummy was ${Math.ceil(c.dist)} units away when the strike landed, but this move reaches ${r}. Move in about ${Math.ceil(c.dist)-r} more units with D before pressing ${k}.`);
+const rc=c.early===0?30:c.early===1?15:0;
+if(c.early)notes.push(`Recovery: ${c.early} input${c.early>1?'s':''} arrived while the move was still recovering and ${c.early>1?'were':'was'} ignored. Wait about ${A.e-A.h} ms after the hit.`);
+if(AD.wrong.length){notes.push(`Input: you also pressed ${[...new Set(AD.wrong)].join(', ')}, but this lesson uses ${k}.`);AD.wrong=[]}
+const tot=ex+ds+rc,ok=tot>=d.min,was=p.done;
+p.tries=(p.tries||0)+1;p.best=Math.max(p.best||0,tot);
+if(ok){if(was)AD.good++;else{p.good=(p.good||0)+1;AD.good=p.good}}
+if(!was&&p.good>=d.need)p.done=true;
+if(p.done)p.stars=p.best>=90?3:p.best>=80?2:1;
+persist();
+AD.fb=`<b>${tot>=90?'Excellent':ok?'Good':'Not yet'}: ${tot} of 100</b> (execution ${ex}/40, distance ${ds}/30, recovery ${rc}/30)<br>`+(notes.length?notes.join('<br>'):'Clean: correct key, struck from inside the target zone, no inputs during recovery.');
+msg((ok?'Good: ':'Not yet: ')+tot+' of 100',2200);
+if(!was&&p.done)setTimeout(lessonDone,900)}
+function lessonDone(){if(mode!=='prac')return;mode='pdone';const d=ACD[AD.i],p=SV.ac[d.id],nx=ACD[AD.i+1];
+ov(`<h2>Lesson complete</h2><p class="tag" style="font-size:22px;letter-spacing:4px;margin:0">${starStr(p.stars)}</p><p>${d.name}: best score ${p.best} of 100.${nx?' Next lesson unlocked: <b>'+nx.name+'</b>.':' You have finished every lesson in the academy.'}</p><div class="row">${nx?`<button class="btn" onclick="openLesson(${AD.i+1})">Next lesson (Enter)</button>`:''}<button class="${nx?'btn2':'btn'}" onclick="showAcademy()">Academy${nx?'':' (Enter)'}</button><button class="btn2" onclick="startPractice(${AD.i})">Practice again</button></div>`);onEnter=nx?()=>openLesson(AD.i+1):showAcademy}
+function drawZone(){const r=MV[AD.id].r,d=en.x-pl.x,inz=d>=.6*r&&d<=r;X.fillStyle=inz?'rgba(47,122,99,.6)':'rgba(47,122,99,.3)';X.fillRect(en.x-r,FY+4,r*.4,12);
+X.font='700 12px system-ui,sans-serif';X.textAlign='center';X.fillStyle='#2a2118';X.fillText('target zone',en.x-r*.8,FY+32);
+pill('Distance '+Math.round(d)+' · reach '+r+(inz?' · in zone':''),W/2,FY+48,14,inz?'rgba(47,122,99,.92)':'rgba(42,33,24,.9)','#f4ead0')}
+
+/* academy HUD (below the canvas): lesson controls and practice feedback */
+function acadHud(){const d=ACD[AD.i],nm=NM[d.id];
+if(mode==='acad'){const tabs=STG.map((n,k)=>`<button class="tab${k===AD.stage?' on':''}" onclick="setStage(${k})">${k+1}. ${n}</button>`).join('');
+return`<b>${d.name}</b> · ${d.diff} · move: ${nm[0]} (key <b>${nm[1]}</b>)<div class="tabs">${tabs}</div><p class="ltxt">${acadText(d,AD.stage)}</p><div class="row" style="margin-top:6px"><button class="btn2" onclick="demoPlay()">${AD.playing?'Pause':'Play'}</button><button class="btn2" onclick="demoReplay()">Replay</button><button class="btn2" onclick="demoSpeed()">Speed: ${AD.speed===1?'normal':AD.speed+'x'}</button><button class="btn" onclick="startPractice(${AD.i})">Practice</button><button class="btn2" onclick="showAcademy()">Back</button></div>`}
+return`<b>${d.name}</b> · practice · key <b>${nm[1]}</b> · good attempts <b>${AD.good} of ${d.need}</b> (score ${d.min}+ each)<p class="ltxt">${AD.fb||'Walk up to the dummy with D, then press '+nm[1]+'. The green strip on the floor is the target zone.'}</p><div class="row" style="margin-top:6px"><button class="btn2" onclick="pracReset()">Reset positions</button><button class="btn2" onclick="openLesson(${AD.i})">Back to lesson</button></div>`}
 
 /* input */
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(!AC)try{AC=new AudioContext()}catch(_){}
 if(k==='enter'){if(onEnter&&$('ov').style.display!=='none'){e.preventDefault();onEnter()}return}
 if(k==='escape'){togglePause();return}
 if(k===' '||k.startsWith('arrow'))e.preventDefault();
-keys[k]=true;if(e.repeat||paused||(mode!=='train'&&mode!=='fight'))return;
+keys[k]=true;if(e.repeat||paused||!live())return;
+if(mode==='prac'){pracKey(k);return}
 if(k==='l')dodge();else if(KEY[k])tryAtk(KEY[k])});
 addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
-addEventListener('blur',()=>{keys.a=keys.d=keys.k=false;if(mode==='train'||mode==='fight')togglePause(true)});
+addEventListener('blur',()=>{keys.a=keys.d=keys.k=false;if(live())togglePause(true)});
 
 /* tutorial clips: animated by default, real video if videos/<move>.mp4 exists */
 const V=document.createElement('video');V.className='vid';V.muted=true;V.playsInline=true;V.controls=true;V.loop=true;$('ov').parentNode.appendChild(V);
@@ -212,8 +303,9 @@ if(guardUp())return POSE.block;return idle()}
 
 /* draw */
 function bar(x,w,fr,col,right,lab){X.fillStyle='#4a3a28';X.fillRect(x,24,w,12);X.fillStyle=col;const ww=w*Math.max(0,fr);X.fillRect(right?x+w-ww:x,24,ww,12);X.fillStyle='#2a2118';X.font='700 13px system-ui,sans-serif';X.textAlign=right?'right':'left';X.fillText(lab,right?x+w:x,19)}
-function draw(){X.setTransform(K,0,0,K,0,0);if(mode==='tut'){drawTut();return}X.drawImage(BG,0,0,W,H);
+function draw(){X.setTransform(K,0,0,K,0,0);if(mode==='tut'){drawTut();return}if(mode==='acad'){drawLesson();return}X.drawImage(BG,0,0,W,H);
 const sh=shakeOff();if(sh){X.save();X.translate(sh[0],sh[1]);X.drawImage(BG,0,0,W,H)}
+if(mode==='prac'||mode==='pdone')drawZone();
 if(en){const c=en.cfg,dm=c.hp>1e8;fig(en.x,-1,enPose(),{s:c.s||1,c:dm?'#3a3a44':'#0a0a0a',band:dm?0:'#c8363f',fall:en.dead?ez((T-en.dt)/500):0});
 if(en.st==='tele'&&!en.dead){const pr=(T-en.tt)/(en.hitAt-en.tt);X.strokeStyle='#c8363f';X.lineWidth=4;X.beginPath();X.arc(en.x-18,FY-84,8+52*(1-pr),0,7);X.stroke();X.fillStyle='#c8363f';X.font='800 26px Georgia,serif';X.textAlign='center';X.fillText('!',en.x-18,FY-150*(c.s||1))}}
 if(pl)fig(pl.x,1,plPose(),{c:'#0a0a0a',band:'#2f7a63',fall:pl.dead?ez((T-pl.dt)/500):0});
@@ -225,9 +317,9 @@ if(en.cfg.hp<1e8){X.fillStyle='#2a2118';X.font='700 14px system-ui,sans-serif';X
 if(combo>=2&&T<comboExp){const left=comboExp-T,pop=Math.max(0,1-(T-comboAt)/160);X.globalAlpha=Math.min(1,left/500);X.textAlign='right';X.fillStyle=mult()>=4?'#c8363f':'#2a2118';X.font='800 '+Math.round(22+8*pop)+'px Georgia,serif';X.fillText(combo+' HIT COMBO',780,62);X.font='700 14px system-ui,sans-serif';X.fillText('Score x'+mult(),780,80);X.fillStyle='#4a3a28';X.fillRect(780-120,86,120,4);X.fillStyle='#f2b441';X.fillRect(780-120*(left/COMBO_MS),86,120*(left/COMBO_MS),4);X.globalAlpha=1}}}
 if(T<msgU&&msgT){X.font='700 16px system-ui,sans-serif';const w=X.measureText(msgT).width+28;X.fillStyle='rgba(42,33,24,.9)';X.fillRect(W/2-w/2,mode==='intro'?232:70,w,32);X.fillStyle='#f4ead0';X.textAlign='center';X.fillText(msgT,W/2,(mode==='intro'?232:70)+21)}}
 let lastH='';
-function hud(){let s;if(mode==='menu')s='Press Start to begin.';else{const st=S(),tr=st&&['train','tdone','intro','tut'].includes(mode);
+function hud(){let s;if(mode==='menu')s=acadSel?'Academy: choose a move to train.':'Press Start to begin.';else if(mode==='acad'||mode==='prac'||mode==='pdone')s=acadHud();else{const st=S(),tr=st&&['train','tdone','intro','tut'].includes(mode);
 s=`<b>Level ${lvl+1}: ${L.name}</b> ${tr?'(training)':'(vs '+L.foe.n+')'}<br>`+(tr?`Goal: ${st.goal}. Progress ${prog} of ${st.need}`:`Defeat ${L.foe.n}. Block, dodge and mix your attacks.`)+'<br><span class="ks"><b>A D</b>move</span>'+[...have].map(h=>`<span class="ks"><b>${NM[h][1]}</b>${NM[h][0]}</span>`).join('')}
 if(s!==lastH){$('hud').innerHTML=s;lastH=s}}
 let last=performance.now();
-function loop(n){const dt=Math.min(.05,(n-last)/1000);last=n;if(!paused){T+=dt*1000;if(mode==='train'||mode==='fight'){updPl(dt);updEn(dt)}if(combo&&T>comboExp)combo=0}draw();hud();requestAnimationFrame(loop)}
+function loop(n){const dt=Math.min(.05,(n-last)/1000);last=n;if(!paused){T+=dt*1000;if(live()){updPl(dt);updEn(dt)}if(mode==='prac')pracTick();if(mode==='acad'&&AD.playing)AD.t+=dt*AD.speed;if(combo&&T>comboExp)combo=0}draw();hud();requestAnimationFrame(loop)}
 showMenu();requestAnimationFrame(loop);
